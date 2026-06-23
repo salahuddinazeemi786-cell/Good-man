@@ -4,7 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = "good-man-app"
         CONTAINER_NAME = "good-man-app"
-        HOST_PORT = "3000"
+        HOST_PORT = "3001"
         CONTAINER_PORT = "3000"
     }
 
