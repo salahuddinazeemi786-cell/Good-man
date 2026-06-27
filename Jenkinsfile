@@ -2,9 +2,16 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "good-man-app"
-        CONTAINER_NAME = "good-man-app"
-        HOST_PORT = "3001"
+        // Custom registry format jo aapko chahiye
+        REGISTRY_URL   = "myregistry.local"
+        IMAGE_NAME     = "good-man"
+        IMAGE_TAG      = "uat-build-${BUILD_NUMBER}"
+        
+        // Final image naam jo build hoga
+        FULL_IMAGE     = "${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
+        
+        CONTAINER_NAME = "good-man-container"
+        HOST_PORT      = "3001"
         CONTAINER_PORT = "3000"
     }
 
@@ -17,37 +24,30 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh '''
-                    docker build -t $IMAGE_NAME:latest .
-                '''
+                sh "docker build -t ${FULL_IMAGE} ."
             }
         }
 
-        stage('Remove Old Container') {
+        stage('Save Image as Tar') {
             steps {
-                sh '''
-                    docker rm -f $CONTAINER_NAME || true
-                '''
+                // Local server par backup ke liye .tar file banayega
+                sh "docker save -o ${IMAGE_NAME}-${IMAGE_TAG}.tar ${FULL_IMAGE}"
             }
         }
 
-        stage('Deploy New Container') {
+        stage('Deploy Container') {
             steps {
-                sh '''
-                    docker run -d \
-                    --name $CONTAINER_NAME \
-                    --restart unless-stopped \
-                    -p $HOST_PORT:$CONTAINER_PORT \
-                    $IMAGE_NAME:latest
-                '''
-            }
-        }
-
-        stage('Verify Deployment') {
-            steps {
-                sh '''
-                    docker ps | grep $CONTAINER_NAME
-                '''
+                script {
+                    try {
+                        sh "docker stop ${CONTAINER_NAME} || true"
+                        sh "docker rm ${CONTAINER_NAME} || true"
+                    } catch (Exception e) {
+                        echo "No running container found to stop."
+                    }
+                    
+                    // Nayi custom image se container run hoga
+                    sh "docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:${CONTAINER_PORT} ${FULL_IMAGE}"
+                }
             }
         }
     }
